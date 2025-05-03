@@ -3,7 +3,8 @@ from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
-from app import db
+# Import db from a separate file to avoid circular imports
+from database import db
 
 # User model
 class User(UserMixin, db.Model):

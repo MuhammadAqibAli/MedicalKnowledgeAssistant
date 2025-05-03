@@ -1,11 +1,10 @@
 import os
 import logging
 from flask import Flask, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
 import json
 from datetime import datetime
 from dotenv import load_dotenv
+from database import db
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,13 +19,6 @@ class CustomJSONEncoder(json.JSONEncoder):
         if isinstance(obj, datetime):
             return obj.isoformat()
         return super().default(obj)
-
-# SQLAlchemy Base class
-class Base(DeclarativeBase):
-    pass
-
-# Initialize SQLAlchemy
-db = SQLAlchemy(model_class=Base)
 
 # Create Flask app
 app = Flask(__name__)
