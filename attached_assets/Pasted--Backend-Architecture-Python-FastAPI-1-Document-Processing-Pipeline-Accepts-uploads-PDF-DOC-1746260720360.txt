@@ -1,0 +1,129 @@
+ Backend Architecture (Python + FastAPI)
+📄 1. Document Processing Pipeline
+Accepts uploads (PDF/DOCX)
+
+Parse text using:
+
+PyMuPDF (PDF)
+
+python-docx (DOCX)
+
+Use LangChain for chunking
+
+Generate embeddings using HuggingFace (e.g., all-MiniLM-L6-v2)
+
+Store in:
+
+Supabase Storage (original file)
+
+Supabase pgvector (embeddings + metadata)
+
+🔍 2. RAG Retrieval API
+On topic request:
+
+Embed the query
+
+Search pgvector for matching document chunks
+
+If relevant results ≥ threshold → use as RAG context
+
+If not → fallback to pure LLM prompt without context
+
+🤖 3. LLM Model Engine
+Implement a model-selection system
+
+Available models:
+
+LLAMA (via Hugging Face Inference API or local llama-cpp-python)
+
+Other OSS models like Falcon, Mistral, OpenHermes (via Hugging Face API)
+
+Use LangChain prompt templates to ensure:
+
+Type-specific instructions (Policy, etc.)
+
+New Zealand healthcare language and compliance tone
+
+Example prompt (for fallback or RAG):
+
+css
+Copy
+Edit
+You are a helpful assistant specialized in New Zealand healthcare standards.
+Generate a [Policy/Best Practice/etc.] about "{TOPIC}".
+{if context exists → "Use the following context from official documents:\n{context}"}
+✅ 4. LLM Output Validation Engine
+After content is generated:
+
+Run it through secondary LLMs (e.g., a separate LLAMA or smaller model)
+
+Validate for:
+
+Consistency
+
+Clinical relevance
+
+Language tone (formal, concise, medically appropriate)
+
+Flag potential issues:
+
+"Lacks specificity"
+
+"Contradictory statements"
+
+"Non-compliant with NZ regulations"
+
+Display validation summary to the user
+
+💾 5. Content Storage APIs
+Save generated content to Supabase with metadata:
+
+Title/topic
+
+Type
+
+Date
+
+Source documents (if any)
+
+LLM used
+
+Validation results
+
+Provide search and filter endpoints by:
+
+Type
+
+LLM used
+
+Validation score
+
+Date
+
+🔧 Tech Stack
+Component	Technology
+Frontend UI	React.js, Tailwind CSS
+Backend Framework	FastAPI
+PDF Parser	PyMuPDF
+DOCX Parser	python-docx
+Chunking / RAG	LangChain
+Embeddings	HuggingFace Transformers (all-MiniLM-L6-v2 or similar)
+Vector DB	Supabase pgvector
+LLM Models	LLAMA, Mistral, Falcon (via Hugging Face API or local)
+LLM Validation	Small LLM run locally or Hugging Face endpoint
+Storage	Supabase Buckets
+Auth	Supabase Auth
+Database	Supabase (PostgreSQL)
+
+🌐 Additional Notes
+No Docker required at this stage.
+
+Designed for use by healthcare administrators, compliance officers, or medical directors in New Zealand.
+
+Future Enhancements:
+
+Add custom prompt tuners per organization
+
+Audit logs of generation sessions
+
+Multi-user roles and permissions
