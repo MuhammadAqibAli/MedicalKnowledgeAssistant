@@ -3,7 +3,7 @@ import logging
 from flask import request, jsonify
 from werkzeug.utils import secure_filename
 from app import db
-from db_models import Document, GeneratedContent, ValidationResult, User, document_content_association
+from models import Document, DocumentChunk, GeneratedContent, ValidationResult, User, DocumentContentAssociation
 from document_processor import DocumentProcessor
 from rag_engine import RAGEngine
 from llm_service import LLMService

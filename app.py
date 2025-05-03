@@ -2,7 +2,7 @@ import os
 import logging
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.middleware.proxy_fix import ProxyFix
+from sqlalchemy.orm import DeclarativeBase
 import json
 from datetime import datetime
 from dotenv import load_dotenv
@@ -21,6 +21,13 @@ class CustomJSONEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
+# SQLAlchemy Base class
+class Base(DeclarativeBase):
+    pass
+
+# Initialize SQLAlchemy
+db = SQLAlchemy(model_class=Base)
+
 # Create Flask app
 app = Flask(__name__)
 app.json_encoder = CustomJSONEncoder
@@ -37,11 +44,8 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # Max upload file size: 16MB
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-# Initialize SQLAlchemy with the app
-db = SQLAlchemy(app)
-
-# Import models
-from db_models import Base, User, Document, DocumentChunk, GeneratedContent, ValidationResult
+# Initialize extensions
+db.init_app(app)
 
 # CORS settings for API
 @app.after_request
@@ -61,17 +65,20 @@ def index():
         'documentation': '/api/v1/docs'
     })
 
+# Initialize the database
+with app.app_context():
+    # Import models to ensure tables are created
+    import models  # noqa: F401
+    
+    try:
+        db.create_all()
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {e}")
+
+# Import and register routes
+from routes import register_routes
+register_routes(app)
+
 if __name__ == '__main__':
-    with app.app_context():
-        # Create all tables
-        try:
-            Base.metadata.create_all(db.engine)
-            logger.info("Database tables created successfully")
-        except Exception as e:
-            logger.error(f"Error creating database tables: {e}")
-    
-    # Import and register routes after models are set up
-    from routes import register_routes
-    register_routes(app)
-    
     app.run(host='0.0.0.0', port=5000, debug=True)
