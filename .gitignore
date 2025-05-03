@@ -1,3 +1,20 @@
+# Environment variables - comprehensive
+.env
+**/.env
+.env.*
+**/.env.*
+.env.local
+.env.development
+.env.test
+.env.production
+.env.backup
+.env.*.local
+env.bak/
+env/
+.venv
+venv/
+ENV/
+
 # Python bytecode and cache
 __pycache__/
 **/__pycache__/
@@ -24,19 +41,11 @@ wheels/
 MANIFEST
 
 # Virtual Environment - comprehensive
-.env
-.venv
-venv/
-ENV/
-env/
-virtualenv/
-.python-version
 pyvenv.cfg
 pip-log.txt
 pip-delete-this-directory.txt
-.env-*
-*/.env
-**/.env.*
+.python-version
+virtualenv/
 .venv/
 **/.venv/
 **/.venv/**
@@ -153,15 +162,6 @@ nbproject/
 .transformers/
 .spacy/
 .nltk_data/
-
-# Environment variables
-.env
-.env.local
-.env.development
-.env.test
-.env.production
-.env.backup
-.env.*.local
 
 # Jupyter Notebook
 .ipynb_checkpoints
