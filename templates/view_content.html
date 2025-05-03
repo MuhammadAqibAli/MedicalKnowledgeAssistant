@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block title %}View Content - NZ Medical Document Assistant{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-8">
+        <h2>{{ content.title }}</h2>
+        <p class="text-muted">
+            <span class="badge 
+                {% if content.content_type == 'Policy' %}bg-primary
+                {% elif content.content_type == 'Best Practice' %}bg-success
+                {% elif content.content_type == 'Procedure' %}bg-warning
+                {% elif content.content_type == 'Standing Order' %}bg-danger
+                {% else %}bg-secondary{% endif %}">
+                {{ content.content_type }}
+            </span>
+            <span class="ms-2">Generated on {{ content.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            <span class="ms-2">Model: {{ content.llm_model_used.split('/')[-1] }}</span>
+            {% if content.rag_used %}
+            <span class="badge bg-info ms-2">RAG Enhanced</span>
+            {% endif %}
+        </p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-primary" id="printBtn">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <button type="button" class="btn btn-outline-success" id="downloadBtn">
+                <i class="fas fa-download"></i> Download
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="copyBtn">
+                <i class="fas fa-copy"></i> Copy
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <div id="contentDisplay" class="mb-4">
+                    {{ content.content|nl2br }}
+                </div>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('documents') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Documents
+                    </a>
+                    <button type="button" class="btn btn-primary" id="regenerateBtn">
+                        <i class="fas fa-sync-alt"></i> Regenerate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-clipboard-check"></i> Validation Report
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if content.validation_score %}
+                <div class="text-center mb-3">
+                    <div class="h1 mb-0">
+                        {{ "%.0f"|format(content.validation_score * 100) }}%
+                    </div>
+                    <div class="text-muted">Overall Score</div>
+                </div>
+                
+                <div class="progress mb-4" style="height: 8px;">
+                    <div class="progress-bar bg-{{ 'success' if content.validation_score >= 0.8 else 'warning' if content.validation_score >= 0.6 else 'danger' }}" 
+                         role="progressbar" 
+                         style="width: {{ content.validation_score * 100 }}%"
+                         aria-valuenow="{{ content.validation_score * 100 }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100"></div>
+                </div>
+                
+                {% if content.validation_feedback %}
+                <div class="mb-3">
+                    <h6>Feedback:</h6>
+                    
+                    {% if content.validation_feedback.details %}
+                    {% for category, detail in content.validation_feedback.details.items() %}
+                    {% if category != 'recommendations' %}
+                    <div class="mb-2">
+                        <strong>{{ category|title }}:</strong>
+                        <div class="small">{{ detail }}</div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                </div>
+                
+                {% if content.validation_feedback.details and content.validation_feedback.details.recommendations %}
+                <div class="alert alert-warning">
+                    <h6>Recommendations:</h6>
+                    <ul class="mb-0">
+                    {% for recommendation in content.validation_feedback.details.recommendations %}
+                        <li>{{ recommendation }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% endif %}
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> Validation results not available
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if source_documents %}
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-book"></i> Source Documents
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="small">This content was generated using the following documents as reference:</p>
+                <ul class="list-group list-group-flush">
+                    {% for doc in source_documents %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>{{ doc.title }}</strong>
+                                <div class="small text-muted">{{ doc.doc_type }}</div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary view-source-btn" data-doc-id="{{ doc.id }}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Source Document Modal -->
+<div class="modal fade" id="sourceDocumentModal" tabindex="-1" aria-labelledby="sourceDocumentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sourceDocumentModalLabel">Source Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center py-4" id="sourceDocumentLoading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading source document...</p>
+                </div>
+                <div id="sourceDocumentContent" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Print functionality
+    document.getElementById('printBtn').addEventListener('click', function() {
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>${document.title}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; }
+                    h1 { margin-bottom: 5px; }
+                    .metadata { color: #666; margin-bottom: 20px; }
+                    hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
+                    .footer { font-size: 12px; color: #999; margin-top: 30px; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <h1>${document.querySelector('h2').textContent}</h1>
+                <div class="metadata">
+                    ${document.querySelector('.text-muted').textContent}
+                </div>
+                <hr>
+                ${document.getElementById('contentDisplay').innerHTML}
+                <hr>
+                <div class="footer">
+                    Generated by NZ Medical Document Assistant
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        setTimeout(function() { printWindow.close(); }, 1000);
+    });
+    
+    // Download functionality
+    document.getElementById('downloadBtn').addEventListener('click', function() {
+        const content = document.getElementById('contentDisplay').innerText;
+        const title = document.querySelector('h2').textContent;
+        const blob = new Blob([content], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = title.replace(/\s+/g, '_') + '.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    });
+    
+    // Copy functionality
+    document.getElementById('copyBtn').addEventListener('click', function() {
+        const content = document.getElementById('contentDisplay').innerText;
+        navigator.clipboard.writeText(content).then(() => {
+            // Change button text temporarily
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            setTimeout(() => {
+                this.innerHTML = originalText;
+            }, 2000);
+        });
+    });
+    
+    // Regenerate functionality
+    document.getElementById('regenerateBtn').addEventListener('click', function() {
+        if (confirm('Are you sure you want to regenerate this content? This will create a new version.')) {
+            // Extract title and content type
+            const title = document.querySelector('h2').textContent.split(':')[1].trim();
+            const contentType = document.querySelector('.badge').textContent.trim();
+            
+            // Redirect to generate page with prefilled values
+            window.location.href = `/generate?topic=${encodeURIComponent(title)}&content_type=${encodeURIComponent(contentType)}`;
+        }
+    });
+    
+    // View source document
+    const sourceButtons = document.querySelectorAll('.view-source-btn');
+    if (sourceButtons.length > 0) {
+        sourceButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const docId = this.getAttribute('data-doc-id');
+                
+                // Show modal and loading indicator
+                const modal = new bootstrap.Modal(document.getElementById('sourceDocumentModal'));
+                modal.show();
+                
+                document.getElementById('sourceDocumentLoading').style.display = 'block';
+                document.getElementById('sourceDocumentContent').style.display = 'none';
+                
+                // Mock source document content (in real implementation, would fetch from API)
+                setTimeout(() => {
+                    document.getElementById('sourceDocumentLoading').style.display = 'none';
+                    document.getElementById('sourceDocumentContent').style.display = 'block';
+                    
+                    const sourceTitle = this.closest('.list-group-item').querySelector('strong').textContent;
+                    const sourceType = this.closest('.list-group-item').querySelector('.small').textContent;
+                    
+                    document.getElementById('sourceDocumentContent').innerHTML = `
+                        <div class="mb-3">
+                            <strong>Title:</strong> ${sourceTitle}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Type:</strong> ${sourceType}
+                        </div>
+                        <hr>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> This is where the document content would be displayed.
+                            In a full implementation, this would fetch the actual content chunks from the backend.
+                        </div>
+                    `;
+                }, 1000);
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
