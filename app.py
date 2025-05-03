@@ -68,9 +68,14 @@ with app.app_context():
     except Exception as e:
         logger.error(f"Error creating database tables: {e}")
 
-# Import and register routes
-from routes import register_routes
-register_routes(app)
+# Define a function to register routes after app creation
+def init_routes(app):
+    # Import routes here to avoid circular imports
+    from routes import register_routes
+    register_routes(app)
+
+# Register routes
+init_routes(app)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
