@@ -1,13 +1,22 @@
 import os
 import logging
-from flask import Flask
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
+import json
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Custom JSON encoder to handle datetime
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 # SQLAlchemy Base class
 class Base(DeclarativeBase):
@@ -18,8 +27,8 @@ db = SQLAlchemy(model_class=Base)
 
 # Create Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)  # needed for url_for to generate with https
+app.json_encoder = CustomJSONEncoder
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 
 # Database configuration
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
@@ -31,6 +40,14 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Max upload file size: 16MB
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+# CORS settings for API
+@app.after_request
+def add_cors_headers(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    return response
 
 # Initialize extensions
 db.init_app(app)
@@ -45,6 +62,16 @@ with app.app_context():
         logger.info("Database tables created successfully")
     except Exception as e:
         logger.error(f"Error creating database tables: {e}")
+
+# Root endpoint to indicate API is working
+@app.route('/')
+def index():
+    return jsonify({
+        'success': True,
+        'message': 'NZ Medical Document Assistant API is running',
+        'version': '1.0',
+        'documentation': '/api/v1/docs'
+    })
 
 # Import and register routes
 from routes import register_routes
